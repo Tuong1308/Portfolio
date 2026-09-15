@@ -22,3 +22,9 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Local refactor artefacts
+.codereview/backup-*/
+.codereview/*.bundle
+.codereview/*.bat
+.codereview/*.diff
