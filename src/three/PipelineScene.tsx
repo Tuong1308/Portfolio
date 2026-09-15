@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
+import { STAGES } from "./pipelineStages";
+import { GLOW_FRAG, GLOW_VERT, RAIL_FRAG, RAIL_VERT } from "./pipelineShaders";
 
 /**
  * The authored focal moment of the page.
@@ -10,22 +12,12 @@ import * as THREE from "three";
  * until the run completes. The motion explains the pipeline; it is not decoration.
  */
 
-export type Stage = { id: string; title: string; sub: string };
-
-export const STAGES: Stage[] = [
-  { id: "ui", title: "Browser", sub: "React · Next.js" },
-  { id: "api", title: "API", sub: "Node.js · REST" },
-  { id: "db", title: "Database", sub: "PostgreSQL · MongoDB" },
-  { id: "ship", title: "Docker", sub: "Build · Deploy" },
-  { id: "data", title: "Insight", sub: "Power BI · GA4" },
-];
-
 type Marker = { id: string; x: number; y: number; on: boolean; side: "top" | "bottom" | "right" };
 
 export default function PipelineScene({ onStage }: { onStage?: (i: number) => void }) {
   const host = useRef<HTMLDivElement>(null);
-  const cb = useRef(onStage);
-  cb.current = onStage;
+  const onStageRef = useRef(onStage);
+  onStageRef.current = onStage;
   const [markers, setMarkers] = useState<Marker[]>([]);
 
   useEffect(() => {
@@ -109,23 +101,8 @@ export default function PipelineScene({ onStage }: { onStage?: (i: number) => vo
       transparent: true,
       depthWrite: false,
       uniforms: { uHead: { value: 0 }, uA: { value: new THREE.Color("#3ddc84") } },
-      vertexShader: `
-        attribute float aProg;
-        varying float vP;
-        void main(){
-          vP = aProg;
-          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-        }`,
-      fragmentShader: `
-        uniform float uHead;
-        uniform vec3 uA;
-        varying float vP;
-        void main(){
-          float lit  = step(vP, uHead);                       // already travelled
-          float glow = smoothstep(0.07, 0.0, abs(vP - uHead)); // the packet's wake
-          float a = 0.20 + lit * 0.40 + glow * 0.80;
-          gl_FragColor = vec4(mix(uA * 0.55, uA, lit + glow), a);
-        }`,
+      vertexShader: RAIL_VERT,
+      fragmentShader: RAIL_FRAG,
     });
     const rail = new THREE.Line(railGeo, railMat);
     group.add(rail);
@@ -145,20 +122,8 @@ export default function PipelineScene({ onStage }: { onStage?: (i: number) => vo
         blending: THREE.AdditiveBlending,
         side: THREE.BackSide,
         uniforms: {},
-        vertexShader: `
-          varying vec3 vN; varying vec3 vV;
-          void main(){
-            vN = normalize(normalMatrix * normal);
-            vec4 mv = modelViewMatrix * vec4(position,1.0);
-            vV = -mv.xyz;
-            gl_Position = projectionMatrix * mv;
-          }`,
-        fragmentShader: `
-          varying vec3 vN; varying vec3 vV;
-          void main(){
-            float f = pow(1.0 - abs(dot(normalize(vV), vN)), 2.0);
-            gl_FragColor = vec4(vec3(0.35, 0.95, 0.6) * f, f * 0.6);
-          }`,
+        vertexShader: GLOW_VERT,
+        fragmentShader: GLOW_FRAG,
       })
     );
     group.add(packetGlow);
@@ -223,8 +188,8 @@ export default function PipelineScene({ onStage }: { onStage?: (i: number) => vo
       aim.x = ((e.clientX - r.left) / r.width - 0.5) * 2;
       aim.y = ((e.clientY - r.top) / r.height - 0.5) * 2;
     };
-    const fine = window.matchMedia("(hover: hover)").matches;
-    if (fine) el.addEventListener("pointermove", onMove, { passive: true });
+    const canHover = window.matchMedia("(hover: hover)").matches;
+    if (canHover) el.addEventListener("pointermove", onMove, { passive: true });
 
     // ── run the pipeline ─────────────────────────────────────────────────
     let inView = false;
@@ -284,7 +249,7 @@ export default function PipelineScene({ onStage }: { onStage?: (i: number) => vo
         const at = i / (N - 1);
         if (head >= at && !fired[i]) {
           fired[i] = t;
-          if (i !== lastStage) { lastStage = i; cb.current?.(i); }
+          if (i !== lastStage) { lastStage = i; onStageRef.current?.(i); }
         }
         const since = fired[i] ? t - fired[i] : 99;
         const hit = Math.max(0, 1 - since / 0.85);
@@ -322,7 +287,7 @@ export default function PipelineScene({ onStage }: { onStage?: (i: number) => vo
       cancelAnimationFrame(raf);
       ro.disconnect();
       io.disconnect();
-      if (fine) el.removeEventListener("pointermove", onMove);
+      if (canHover) el.removeEventListener("pointermove", onMove);
       scene.traverse((o) => {
         const m = o as THREE.Mesh;
         m.geometry?.dispose?.();

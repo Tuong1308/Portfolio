@@ -11,16 +11,16 @@ export default function GlowCursor() {
     if (!el) return;
 
     let x = innerWidth / 2, y = innerHeight / 2, cx = x, cy = y, raf = 0;
-    const move = (e: PointerEvent) => { x = e.clientX; y = e.clientY; };
+    const onMove = (e: PointerEvent) => { x = e.clientX; y = e.clientY; };
     const loop = () => {
       cx += (x - cx) * 0.09;
       cy += (y - cy) * 0.09;
       el.style.transform = `translate3d(${cx}px, ${cy}px, 0)`;
       raf = requestAnimationFrame(loop);
     };
-    window.addEventListener("pointermove", move, { passive: true });
+    window.addEventListener("pointermove", onMove, { passive: true });
     loop();
-    return () => { window.removeEventListener("pointermove", move); cancelAnimationFrame(raf); };
+    return () => { window.removeEventListener("pointermove", onMove); cancelAnimationFrame(raf); };
   }, []);
 
   return <div className="glow" ref={ref} aria-hidden="true" />;

@@ -2,7 +2,6 @@ export const PROFILE = {
   name: "Do Tan Tuong",
   short: "Tuong",
   role: "Intern Fullstack Developer",
-  title: "Fullstack Developer",
   company: "Dekon",
   age: 22,
   location: "Ho Chi Minh City, Vietnam",
@@ -48,23 +47,23 @@ export const EXPERIENCE = {
   when: "Present",
   items: [
     {
-      h: "Shipping features end to end",
-      p: "Built product features from the ReactJS/NextJS interface down to REST APIs on NodeJS — reusable components, state handling, and a direct line into the data layer.",
+      heading: "Shipping features end to end",
+      summary: "Built product features from the ReactJS/NextJS interface down to REST APIs on NodeJS — reusable components, state handling, and a direct line into the data layer.",
       stack: ["ReactJS", "NextJS", "TypeScript", "NodeJS"],
     },
     {
-      h: "Designing and querying data",
-      p: "Worked across PostgreSQL and MongoDB: schema design, query tuning, and normalising data so it serves both the app and the reporting layer.",
+      heading: "Designing and querying data",
+      summary: "Worked across PostgreSQL and MongoDB: schema design, query tuning, and normalising data so it serves both the app and the reporting layer.",
       stack: ["PostgreSQL", "MongoDB", "Python"],
     },
     {
-      h: "Measurement and reporting",
-      p: "Built Power BI dashboards and configured GA4 to track real user behaviour — turning raw numbers into something the team can decide on.",
+      heading: "Measurement and reporting",
+      summary: "Built Power BI dashboards and configured GA4 to track real user behaviour — turning raw numbers into something the team can decide on.",
       stack: ["Power BI", "GA4"],
     },
     {
-      h: "Packaging and deployment",
-      p: "Containerised services with Docker and kept dev and staging in sync, so deploys became repeatable instead of risky.",
+      heading: "Packaging and deployment",
+      summary: "Containerised services with Docker and kept dev and staging in sync, so deploys became repeatable instead of risky.",
       stack: ["Docker", "CI/CD"],
     },
   ],
@@ -117,13 +116,13 @@ export const PROJECTS: Project[] = [
 
 export const EDUCATION = [
   {
-    yr: "Bachelor",
-    h: "Bachelor of Information Technology",
-    p: "Grounding in data structures, algorithms, databases and software engineering — the base for how I approach every product problem.",
+    kind: "Bachelor",
+    heading: "Bachelor of Information Technology",
+    summary: "Grounding in data structures, algorithms, databases and software engineering — the base for how I approach every product problem.",
   },
   {
-    yr: "Self-taught",
-    h: "Fullstack & Data",
-    p: "Learning through real projects: React and Next on the front, NodeJS on the API, Power BI and GA4 at the measurement layer.",
+    kind: "Self-taught",
+    heading: "Fullstack & Data",
+    summary: "Learning through real projects: React and Next on the front, NodeJS on the API, Power BI and GA4 at the measurement layer.",
   },
 ];

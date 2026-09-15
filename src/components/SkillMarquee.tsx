@@ -39,8 +39,50 @@ function Chip({ t }: { t: Tool }) {
   );
 }
 
-function Row({ tools, dir, paused: stopped, reduced }: {
-  tools: Tool[]; dir: 1 | -1; paused: boolean; reduced: boolean;
+/**
+ * Scroll velocity feeds the rail: the strip reacts to the reader's own input.
+ * `decay()` is called once per frame and returns the current nudge.
+ */
+function trackScrollKick() {
+  let lastScroll = window.scrollY;
+  let kick = 0;
+  const KICK_MAX = 55; // a nav-link jump scrolls thousands of px in one event —
+                       // without a clamp the strip lurches instead of reacting
+  const onScroll = () => {
+    const y = window.scrollY;
+    const d = Math.max(-KICK_MAX, Math.min(KICK_MAX, y - lastScroll));
+    kick = Math.max(-KICK_MAX, Math.min(KICK_MAX, kick + d * 0.9));
+    lastScroll = y;
+  };
+  window.addEventListener("scroll", onScroll, { passive: true });
+  return {
+    decay: () => (kick *= 0.9), // the nudge is a reaction, not a permanent speed-up
+    dispose: () => window.removeEventListener("scroll", onScroll),
+  };
+}
+
+/** Pointer hover or keyboard focus halts the row under it. */
+function bindHoverPause(vp: HTMLElement) {
+  let paused = false;
+  const enter = () => { paused = true; };
+  const leave = () => { paused = false; };
+  vp.addEventListener("pointerenter", enter);
+  vp.addEventListener("pointerleave", leave);
+  vp.addEventListener("focusin", enter);
+  vp.addEventListener("focusout", leave);
+  return {
+    isPaused: () => paused,
+    dispose: () => {
+      vp.removeEventListener("pointerenter", enter);
+      vp.removeEventListener("pointerleave", leave);
+      vp.removeEventListener("focusin", enter);
+      vp.removeEventListener("focusout", leave);
+    },
+  };
+}
+
+function Row({ tools, dir, reduced }: {
+  tools: Tool[]; dir: 1 | -1; reduced: boolean;
 }) {
   const viewport = useRef<HTMLDivElement>(null);
   const track = useRef<HTMLDivElement>(null);
@@ -80,31 +122,13 @@ function Row({ tools, dir, paused: stopped, reduced }: {
     let x = 0;
     let raf = 0;
     let last = performance.now();
-    let paused = false;
     let inView = false;
-
-    // scroll velocity feeds the rail: the strip reacts to the reader's own input
-    let lastScroll = window.scrollY;
-    let kick = 0;
-    const KICK_MAX = 55; // a nav-link jump scrolls thousands of px in one event —
-                         // without a clamp the strip lurches instead of reacting
-    const onScroll = () => {
-      const y = window.scrollY;
-      const d = Math.max(-KICK_MAX, Math.min(KICK_MAX, y - lastScroll));
-      kick = Math.max(-KICK_MAX, Math.min(KICK_MAX, kick + d * 0.9));
-      lastScroll = y;
-    };
-    window.addEventListener("scroll", onScroll, { passive: true });
+    const kick = trackScrollKick();
 
     const io = new IntersectionObserver(([e]) => { inView = e.isIntersecting; }, { threshold: 0 });
     io.observe(vp);
 
-    const enter = () => { paused = true; };
-    const leave = () => { paused = false; };
-    vp.addEventListener("pointerenter", enter);
-    vp.addEventListener("pointerleave", leave);
-    vp.addEventListener("focusin", enter);
-    vp.addEventListener("focusout", leave);
+    const hover = bindHoverPause(vp);
 
     // The strip runs continuously for everyone; a reduced-motion preference
     // only makes it slower and drops the reactive flourishes.
@@ -116,10 +140,10 @@ function Row({ tools, dir, paused: stopped, reduced }: {
       last = now;
       if (!inView || document.hidden) return;
 
-      kick *= 0.9; // decay: the nudge is a reaction, not a permanent speed-up
-      const drift = paused || stopped ? 0 : BASE;
-      const react = stopped || reduced ? 0 : Math.abs(kick) * 1.6;
-      const push = stopped || reduced ? 0 : kick * dir * dt * 4;
+      const k = kick.decay();
+      const drift = hover.isPaused() ? 0 : BASE;
+      const react = reduced ? 0 : Math.abs(k) * 1.6;
+      const push = reduced ? 0 : k * dir * dt * 4;
       x += (drift + react) * dir * dt + push;
 
       if (setW > 0) {
@@ -127,7 +151,7 @@ function Row({ tools, dir, paused: stopped, reduced }: {
         if (x > 0) x -= setW;   // normalise into (-setW, 0] for either direction
       }
       // a slight lean in the direction of travel reads as speed
-      const skew = reduced ? 0 : Math.max(-3, Math.min(3, kick * dir * 0.05));
+      const skew = reduced ? 0 : Math.max(-3, Math.min(3, k * dir * 0.05));
       tr.style.transform = `translate3d(${x}px, 0, 0) skewX(${skew.toFixed(2)}deg)`;
     };
     raf = requestAnimationFrame(tick);
@@ -136,13 +160,10 @@ function Row({ tools, dir, paused: stopped, reduced }: {
       cancelAnimationFrame(raf);
       ro.disconnect();
       io.disconnect();
-      window.removeEventListener("scroll", onScroll);
-      vp.removeEventListener("pointerenter", enter);
-      vp.removeEventListener("pointerleave", leave);
-      vp.removeEventListener("focusin", enter);
-      vp.removeEventListener("focusout", leave);
+      kick.dispose();
+      hover.dispose();
     };
-  }, [dir, rep, stopped, reduced]);
+  }, [dir, rep, reduced]);
 
   const run = Array.from({ length: rep }, (_, r) => tools.map((t) => ({ t, r }))).flat();
 
@@ -177,8 +198,8 @@ export default function SkillMarquee() {
 
   return (
     <div className="mq-wrap">
-      <Row tools={ROW_A} dir={1} paused={false} reduced={reduced} />
-      <Row tools={ROW_B} dir={-1} paused={false} reduced={reduced} />
+      <Row tools={ROW_A} dir={1} reduced={reduced} />
+      <Row tools={ROW_B} dir={-1} reduced={reduced} />
     </div>
   );
 }
