@@ -12,8 +12,9 @@
 | 1. Làm rõ yêu cầu | `general_requirement.md` | ✅ Xong |
 | 2. Rà soát (plan-refactor Pha 1) | Báo cáo 14 mục + 4 câu hỏi | ✅ Xong |
 | 3. Áp dụng (plan-refactor Pha 2) | 11/11 mục đã duyệt được áp dụng | ✅ Xong |
-| 4. Test + review + chuẩn bị PR | Parity test trước/sau, `PR-refactor-2026-09-15.md` | 🟡 Test cloud xong; còn kiểm tra tay trên máy |
+| 4. Test + review + chuẩn bị PR | Parity test trước/sau, `PR-refactor-2026-09-15.md` | ✅ Xong (còn xem tay 3D trên máy, xem mục 6) |
 | 5. Mục còn treo | M-02, M-03, H-04, Q-01…Q-04 | ⬜ Chưa làm |
+| 6. Đưa lên GitHub | `main` = `fc67351`, build ✓ | 🟡 Còn đổi default branch, xóa nhánh refactor, xem tay |
 
 ---
 
@@ -46,10 +47,18 @@
 - [x] Review senior: không có lỗi chặn merge; 6 ghi chú không chặn (README cũ, gitignore backup, 2 nit, cảnh báo refs có sẵn, bundle lớn)
 - [x] Viết `.codereview/PR-refactor-2026-09-15.md` (mô tả, bảng kiểm tra, checklist reviewer, gợi ý chia commit)
 - [x] Push lên GitHub `Tuong1308/Portfolio`, nhánh `refactor/clean-code-2026-09-15`: `7b24641` refactor + `1b77b20` dọn file chết và artefact local. Clone lại từ GitHub: `src/` khớp bản đã test, build ✓
-- [ ] Tạo `main` / mở PR (nhánh hiện là nhánh duy nhất trên repo)
-- [ ] `npm run build` trên Windows
-- [ ] `npm run dev` — xem lại bằng mắt quả cầu kỹ năng (M-04), pipeline (M-01), dải kỹ năng (M-05)
-- [ ] Cập nhật mục "Structure" trong `README.md` (thêm 2 file mới trong `three/`)
+- [x] Tạo `main` trên GitHub (thay cho PR, vì nhánh refactor không có lịch sử gốc để so diff)
+- [x] Cập nhật mục "Structure" trong `README.md` (thêm `three/pipelineStages.ts`, `three/pipelineShaders.ts`)
+
+### 6. Đưa lên GitHub — 2026-09-15
+- [x] `main` = `fc67351` (`7b24641` refactor → `1b77b20` dọn file → `fc67351` cập nhật PROGRESS)
+- [x] Clone lại `main` từ GitHub: build ✓, oxlint 8 cảnh báo (bằng lúc test), không còn file chết hay artefact local
+- [ ] Đổi default branch trên GitHub sang `main` (Settings → General → Default branch; hiện vẫn là `refactor/clean-code-2026-09-15`)
+- [ ] Xóa nhánh `refactor/clean-code-2026-09-15` (nội dung đã nằm hết trong `main`)
+- [ ] Nếu deploy Vercel: kiểm tra Production Branch là `main`
+- [ ] `npm run build` + `npm run dev` trên máy: xem quả cầu kỹ năng, pipeline, dải kỹ năng, menu mobile
+
+**Mốc:** refactor đã lên `main`, build từ GitHub đạt.
 
 ### 5. Mục còn treo
 - [ ] M-02 — tách `useEffect` ~300 dòng của `PipelineScene` (bạn chưa duyệt)

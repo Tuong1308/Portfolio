@@ -53,6 +53,8 @@ src/
     PipelineScene.tsx  # ⭐ focal moment: a data packet travels Browser→API→DB→Docker→Insight,
                        #   the rail lights up behind it, nodes fire as it lands,
                        #   HTML labels track 3D coordinates, layout flips horizontal ↔ vertical
+    pipelineStages.ts  # STAGES — shared by the scene and the Experience legend
+    pipelineShaders.ts # GLSL for the rail and the packet glow
     SkillsOrb.tsx      # skills sphere: drag to spin, raycast hover on each node
 ```
 
