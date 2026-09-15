@@ -10,7 +10,7 @@ import * as THREE from "three";
  * until the run completes. The motion explains the pipeline; it is not decoration.
  */
 
-export type Stage = { id: string; title: string; sub: string };
+type Stage = { id: string; title: string; sub: string };
 
 export const STAGES: Stage[] = [
   { id: "ui", title: "Browser", sub: "React · Next.js" },

@@ -2,7 +2,6 @@ export const PROFILE = {
   name: "Do Tan Tuong",
   short: "Tuong",
   role: "Intern Fullstack Developer",
-  title: "Fullstack Developer",
   company: "Dekon",
   age: 22,
   location: "Ho Chi Minh City, Vietnam",

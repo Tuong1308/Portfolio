@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 
-export const SKILLS = [
+const SKILLS = [
   "Python", "JavaScript", "TypeScript", "PostgreSQL", "MongoDB",
   "Node.js", "React", "Next.js", "Docker", "Power BI", "GA4",
 ];

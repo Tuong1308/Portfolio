@@ -39,8 +39,8 @@ function Chip({ t }: { t: Tool }) {
   );
 }
 
-function Row({ tools, dir, paused: stopped, reduced }: {
-  tools: Tool[]; dir: 1 | -1; paused: boolean; reduced: boolean;
+function Row({ tools, dir, reduced }: {
+  tools: Tool[]; dir: 1 | -1; reduced: boolean;
 }) {
   const viewport = useRef<HTMLDivElement>(null);
   const track = useRef<HTMLDivElement>(null);
@@ -117,9 +117,9 @@ function Row({ tools, dir, paused: stopped, reduced }: {
       if (!inView || document.hidden) return;
 
       kick *= 0.9; // decay: the nudge is a reaction, not a permanent speed-up
-      const drift = paused || stopped ? 0 : BASE;
-      const react = stopped || reduced ? 0 : Math.abs(kick) * 1.6;
-      const push = stopped || reduced ? 0 : kick * dir * dt * 4;
+      const drift = paused ? 0 : BASE;
+      const react = reduced ? 0 : Math.abs(kick) * 1.6;
+      const push = reduced ? 0 : kick * dir * dt * 4;
       x += (drift + react) * dir * dt + push;
 
       if (setW > 0) {
@@ -142,7 +142,7 @@ function Row({ tools, dir, paused: stopped, reduced }: {
       vp.removeEventListener("focusin", enter);
       vp.removeEventListener("focusout", leave);
     };
-  }, [dir, rep, stopped, reduced]);
+  }, [dir, rep, reduced]);
 
   const run = Array.from({ length: rep }, (_, r) => tools.map((t) => ({ t, r }))).flat();
 
@@ -177,8 +177,8 @@ export default function SkillMarquee() {
 
   return (
     <div className="mq-wrap">
-      <Row tools={ROW_A} dir={1} paused={false} reduced={reduced} />
-      <Row tools={ROW_B} dir={-1} paused={false} reduced={reduced} />
+      <Row tools={ROW_A} dir={1} reduced={reduced} />
+      <Row tools={ROW_B} dir={-1} reduced={reduced} />
     </div>
   );
 }
