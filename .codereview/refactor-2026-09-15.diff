@@ -1,0 +1,1131 @@
+diff -ruN orig-src/Contact.tsx p/src/Contact.tsx
+--- orig-src/Contact.tsx	2026-09-15 06:40:15.200502973 +0000
++++ p/src/Contact.tsx	1970-01-01 00:00:00.000000000 +0000
+@@ -1,260 +0,0 @@
+-import { useRef, useState } from "react";
+-import { PROFILE } from "./data";
+-
+-/**
+- * Leave this empty and the form opens the visitor's mail client with everything
+- * filled in — no backend, and no pretending a message was delivered when it was
+- * not. Paste a form endpoint (Formspree, Web3Forms, your own route) and the same
+- * form POSTs to it instead.
+- */
+-const FORM_ENDPOINT = "";
+-
+-const sw = {
+-  fill: "none",
+-  stroke: "currentColor",
+-  strokeWidth: 1.7,
+-  strokeLinecap: "round" as const,
+-  strokeLinejoin: "round" as const,
+-};
+-
+-const Icon = {
+-  mail: (
+-    <svg viewBox="0 0 24 24" width="19" height="19" {...sw}>
+-      <rect x="2.5" y="4.5" width="19" height="15" rx="2.5" />
+-      <path d="m3 7 9 6 9-6" />
+-    </svg>
+-  ),
+-  pin: (
+-    <svg viewBox="0 0 24 24" width="19" height="19" {...sw}>
+-      <path d="M12 21s7-6.2 7-11a7 7 0 1 0-14 0c0 4.8 7 11 7 11Z" />
+-      <circle cx="12" cy="10" r="2.6" />
+-    </svg>
+-  ),
+-  phone: (
+-    <svg viewBox="0 0 24 24" width="19" height="19" {...sw}>
+-      <path d="M6.5 2.5h3l1.5 4-2 1.5a12 12 0 0 0 5 5l1.5-2 4 1.5v3a2 2 0 0 1-2.2 2A17 17 0 0 1 4.5 4.7 2 2 0 0 1 6.5 2.5Z" />
+-    </svg>
+-  ),
+-  copy: (
+-    <svg viewBox="0 0 24 24" width="16" height="16" {...sw}>
+-      <rect x="9" y="9" width="11" height="11" rx="2.5" />
+-      <path d="M15 5.5A2.5 2.5 0 0 0 12.5 3h-7A2.5 2.5 0 0 0 3 5.5v7A2.5 2.5 0 0 0 5.5 15" />
+-    </svg>
+-  ),
+-  check: (
+-    <svg viewBox="0 0 24 24" width="16" height="16" {...sw}>
+-      <path d="m5 12.5 4.5 4.5L19 7" />
+-    </svg>
+-  ),
+-  code: (
+-    <svg viewBox="0 0 24 24" width="19" height="19" {...sw}>
+-      <path d="m8.5 8.5-4 3.5 4 3.5M15.5 8.5l4 3.5-4 3.5M13.4 5.5l-2.8 13" />
+-    </svg>
+-  ),
+-  send: (
+-    <svg viewBox="0 0 24 24" width="17" height="17" {...sw}>
+-      <path d="M21 3 10.5 13.5M21 3l-6.8 18-3.7-7.5L3 9.8 21 3Z" />
+-    </svg>
+-  ),
+-};
+-
+-/* ── a value you can take away with one click ───────────────── */
+-function CopyLine({ value }: { value: string }) {
+-  const [done, setDone] = useState(false);
+-  const timer = useRef(0);
+-
+-  const copy = async () => {
+-    try {
+-      await navigator.clipboard.writeText(value);
+-    } catch {
+-      // clipboard is blocked outside a secure context — select it instead so the
+-      // visitor can still copy manually rather than getting a silent no-op
+-      const r = document.createRange();
+-      const el = document.getElementById(`cv-${value}`);
+-      if (el) {
+-        r.selectNodeContents(el);
+-        const sel = getSelection();
+-        sel?.removeAllRanges();
+-        sel?.addRange(r);
+-      }
+-      return;
+-    }
+-    setDone(true);
+-    window.clearTimeout(timer.current);
+-    timer.current = window.setTimeout(() => setDone(false), 1600);
+-  };
+-
+-  return (
+-    <span className="copy-line">
+-      <span id={`cv-${value}`}>{value}</span>
+-      <button
+-        type="button"
+-        className={`copy-btn${done ? " done" : ""}`}
+-        onClick={copy}
+-        aria-label={done ? `${value} copied` : `Copy ${value}`}
+-      >
+-        {done ? Icon.check : Icon.copy}
+-      </button>
+-      <span className="sr-only" role="status">{done ? "Copied to clipboard" : ""}</span>
+-    </span>
+-  );
+-}
+-
+-type Status = { kind: "idle" | "sending" | "opened" | "sent" | "error"; note?: string };
+-
+-export default function Contact() {
+-  const [status, setStatus] = useState<Status>({ kind: "idle" });
+-  const [errors, setErrors] = useState<Record<string, string>>({});
+-
+-  const submit = async (e: React.FormEvent<HTMLFormElement>) => {
+-    e.preventDefault();
+-    const form = e.currentTarget;
+-    const data = new FormData(form);
+-    const name = String(data.get("name") ?? "").trim();
+-    const email = String(data.get("email") ?? "").trim();
+-    const subject = String(data.get("subject") ?? "").trim();
+-    const message = String(data.get("message") ?? "").trim();
+-
+-    const next: Record<string, string> = {};
+-    if (!name) next.name = "Please tell me your name.";
+-    if (!email) next.email = "I need an address to reply to.";
+-    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) next.email = "That address looks incomplete.";
+-    if (!message) next.message = "Add a line or two about what you need.";
+-    setErrors(next);
+-    if (Object.keys(next).length) {
+-      form.querySelector<HTMLElement>(`[name="${Object.keys(next)[0]}"]`)?.focus();
+-      setStatus({ kind: "idle" });
+-      return;
+-    }
+-
+-    if (FORM_ENDPOINT) {
+-      setStatus({ kind: "sending" });
+-      try {
+-        const res = await fetch(FORM_ENDPOINT, {
+-          method: "POST",
+-          headers: { Accept: "application/json" },
+-          body: data,
+-        });
+-        if (!res.ok) throw new Error(String(res.status));
+-        form.reset();
+-        setStatus({ kind: "sent" });
+-      } catch {
+-        setStatus({ kind: "error" });
+-      }
+-      return;
+-    }
+-
+-    // No endpoint configured: hand the message to the visitor's mail client.
+-    // Say exactly that — never claim it was sent.
+-    const body = `${message}\n\n—\n${name}\n${email}`;
+-    window.location.href =
+-      `mailto:${PROFILE.email}` +
+-      `?subject=${encodeURIComponent(subject || `Portfolio enquiry from ${name}`)}` +
+-      `&body=${encodeURIComponent(body)}`;
+-    setStatus({ kind: "opened" });
+-  };
+-
+-  const field = (n: string) => (errors[n] ? { "aria-invalid": true, "aria-describedby": `${n}-err` } : {});
+-
+-  return (
+-    <section className="section contact scene" id="contact">
+-      <span className="scene-veil" aria-hidden="true" />
+-      <span className="scene-cut" aria-hidden="true" />
+-
+-      <div className="wrap contact-grid">
+-        {/* ── left: the invitation ─────────────────────────── */}
+-        <div className="contact-lead">
+-          <h2 className="contact-h">
+-            Let&apos;s connect,
+-            <span> and build something that runs.</span>
+-          </h2>
+-          <p className="contact-copy">
+-            Whether you already have a spec or just want to talk through what a build would take,
+-            I&apos;m happy to have the conversation. I reply fast.
+-          </p>
+-
+-          <dl className="contact-rows">
+-            <div className="crow">
+-              <span className="crow-ico" aria-hidden="true">{Icon.mail}</span>
+-              <div>
+-                <dt>Email</dt>
+-                <dd><CopyLine value={PROFILE.email} /></dd>
+-              </div>
+-            </div>
+-            <div className="crow">
+-              <span className="crow-ico" aria-hidden="true">{Icon.phone}</span>
+-              <div>
+-                <dt>Phone</dt>
+-                <dd><CopyLine value={PROFILE.phone} /></dd>
+-              </div>
+-            </div>
+-            <div className="crow">
+-              <span className="crow-ico" aria-hidden="true">{Icon.pin}</span>
+-              <div>
+-                <dt>Location</dt>
+-                <dd>{PROFILE.location}</dd>
+-              </div>
+-            </div>
+-          </dl>
+-
+-          <ul className="contact-social">
+-            <li>
+-              <a href={PROFILE.github} target="_blank" rel="noreferrer" aria-label="GitHub profile">
+-                {Icon.code}
+-              </a>
+-            </li>
+-            <li>
+-              <a href={`mailto:${PROFILE.email}`} aria-label="Send an email">{Icon.mail}</a>
+-            </li>
+-            <li>
+-              <a href={`tel:${PROFILE.phone}`} aria-label="Call">{Icon.phone}</a>
+-            </li>
+-          </ul>
+-        </div>
+-
+-        {/* ── right: the form ──────────────────────────────── */}
+-        <form className="contact-form" onSubmit={submit} noValidate>
+-          <div className="cf-row">
+-            <p className="cf-field">
+-              <label htmlFor="cf-name">Name</label>
+-              <input id="cf-name" name="name" type="text" placeholder="Your name"
+-                     autoComplete="name" {...field("name")} />
+-              {errors.name && <em id="name-err">{errors.name}</em>}
+-            </p>
+-            <p className="cf-field">
+-              <label htmlFor="cf-email">Email</label>
+-              <input id="cf-email" name="email" type="email" placeholder="you@company.com"
+-                     autoComplete="email" {...field("email")} />
+-              {errors.email && <em id="email-err">{errors.email}</em>}
+-            </p>
+-          </div>
+-
+-          <p className="cf-field">
+-            <label htmlFor="cf-subject">Subject</label>
+-            <input id="cf-subject" name="subject" type="text" placeholder="What is this about?" />
+-          </p>
+-
+-          <p className="cf-field">
+-            <label htmlFor="cf-message">Message</label>
+-            <textarea id="cf-message" name="message" rows={6}
+-                      placeholder="Write your message here…" {...field("message")} />
+-            {errors.message && <em id="message-err">{errors.message}</em>}
+-          </p>
+-
+-          <button className="cf-send" type="submit" disabled={status.kind === "sending"}>
+-            {status.kind === "sending" ? "Sending…" : FORM_ENDPOINT ? "Send message" : "Compose email"}
+-            {Icon.send}
+-          </button>
+-
+-          <p className={`cf-status${status.kind !== "idle" ? " show" : ""}`} role="status" aria-live="polite">
+-            {status.kind === "opened" &&
+-              "Your mail app should be open with the message ready — press send there and it reaches me."}
+-            {status.kind === "sent" && "Message sent. I'll get back to you shortly."}
+-            {status.kind === "error" &&
+-              `That didn't go through. Email me directly at ${PROFILE.email}.`}
+-          </p>
+-        </form>
+-      </div>
+-    </section>
+-  );
+-}
+diff -ruN orig-src/SkillMarquee.tsx p/src/SkillMarquee.tsx
+--- orig-src/SkillMarquee.tsx	2026-09-15 06:40:15.199276281 +0000
++++ p/src/SkillMarquee.tsx	1970-01-01 00:00:00.000000000 +0000
+@@ -1,199 +0,0 @@
+-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+-import {
+-  siPython, siJavascript, siTypescript, siReact, siNextdotjs, siNodedotjs,
+-  siPostgresql, siMongodb, siDocker, siGoogleanalytics, siGit, siGithub, siVercel,
+-} from "simple-icons";
+-
+-type Tool = { name: string; path: string; hex: string };
+-
+-const si = (i: { title: string; path: string; hex: string }, name?: string): Tool =>
+-  ({ name: name ?? i.title, path: i.path, hex: `#${i.hex}` });
+-
+-/* Power BI is not carried by simple-icons, so this one is an authored glyph
+-   drawn in the same 24-grid as the rest — a column chart, not a logo. */
+-const POWER_BI: Tool = {
+-  name: "Power BI",
+-  hex: "#F2C811",
+-  path: "M3 20h18v1.6H3V20Zm1.6-7.2h3.2v6.4H4.6v-6.4Zm5.6-4.8h3.2v11.2h-3.2V8Zm5.6-5.6h3.2v16.8h-3.2V2.4Z",
+-};
+-
+-/** Row 1 travels right, row 2 travels left. */
+-const ROW_A: Tool[] = [
+-  si(siTypescript), si(siReact, "React"), si(siNextdotjs, "Next.js"),
+-  si(siNodedotjs, "Node.js"), si(siPostgresql), si(siPython),
+-];
+-const ROW_B: Tool[] = [
+-  si(siMongodb), si(siDocker), si(siJavascript), si(siGoogleanalytics, "GA4"),
+-  POWER_BI, si(siGit), si(siGithub), si(siVercel),
+-];
+-
+-function Chip({ t }: { t: Tool }) {
+-  return (
+-    <li className="mq-chip">
+-      <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+-        <path d={t.path} fill={t.hex === "#000000" ? "currentColor" : t.hex} />
+-      </svg>
+-      <span>{t.name}</span>
+-    </li>
+-  );
+-}
+-
+-/** Live-updating `prefers-reduced-motion`, so the page reacts to the OS setting
+- *  being changed while it is open rather than only at load. */
+-function useReducedMotion() {
+-  const [reduced, setReduced] = useState(
+-    () => typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches
+-  );
+-  useEffect(() => {
+-    const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
+-    const on = () => setReduced(mq.matches);
+-    mq.addEventListener?.("change", on);
+-    return () => mq.removeEventListener?.("change", on);
+-  }, []);
+-  return reduced;
+-}
+-
+-function Row({ tools, dir, paused: stopped, reduced }: {
+-  tools: Tool[]; dir: 1 | -1; paused: boolean; reduced: boolean;
+-}) {
+-  const viewport = useRef<HTMLDivElement>(null);
+-  const track = useRef<HTMLDivElement>(null);
+-  const probe = useRef<HTMLUListElement>(null);
+-  // one set must be at least as wide as the viewport, or the loop shows a gap
+-  const [rep, setRep] = useState(1);
+-
+-  useLayoutEffect(() => {
+-    const vp = viewport.current;
+-    const one = probe.current;
+-    if (!vp || !one) return;
+-    const fit = () => {
+-      const unit = one.scrollWidth / rep;
+-      if (!unit) return;
+-      const need = Math.max(1, Math.ceil(vp.clientWidth / unit) + 1);
+-      if (need !== rep) setRep(need);
+-    };
+-    fit();
+-    const ro = new ResizeObserver(fit);
+-    ro.observe(vp);
+-    return () => ro.disconnect();
+-  }, [rep]);
+-
+-  useEffect(() => {
+-    const vp = viewport.current;
+-    const tr = track.current;
+-    if (!vp || !tr) return;
+-
+-    let setW = 0;
+-    const measure = () => { setW = tr.scrollWidth / 2; };
+-    measure();
+-    const ro = new ResizeObserver(measure);
+-    ro.observe(tr);
+-
+-    // position is always kept inside (-setW, 0]; translating by exactly one set
+-    // width is invisible because the second set is an identical copy
+-    let x = 0;
+-    let raf = 0;
+-    let last = performance.now();
+-    let paused = false;
+-    let inView = false;
+-
+-    // scroll velocity feeds the rail: the strip reacts to the reader's own input
+-    let lastScroll = window.scrollY;
+-    let kick = 0;
+-    const KICK_MAX = 55; // a nav-link jump scrolls thousands of px in one event —
+-                         // without a clamp the strip lurches instead of reacting
+-    const onScroll = () => {
+-      const y = window.scrollY;
+-      const d = Math.max(-KICK_MAX, Math.min(KICK_MAX, y - lastScroll));
+-      kick = Math.max(-KICK_MAX, Math.min(KICK_MAX, kick + d * 0.9));
+-      lastScroll = y;
+-    };
+-    window.addEventListener("scroll", onScroll, { passive: true });
+-
+-    const io = new IntersectionObserver(([e]) => { inView = e.isIntersecting; }, { threshold: 0 });
+-    io.observe(vp);
+-
+-    const enter = () => { paused = true; };
+-    const leave = () => { paused = false; };
+-    vp.addEventListener("pointerenter", enter);
+-    vp.addEventListener("pointerleave", leave);
+-    vp.addEventListener("focusin", enter);
+-    vp.addEventListener("focusout", leave);
+-
+-    // The strip runs continuously for everyone. Under a reduced-motion
+-    // preference it runs slower and drops the reactive flourishes, and the Pause
+-    // control below is always present so anyone can stop it outright.
+-    const BASE = reduced ? 20 : 34; // px per second
+-
+-    const tick = (now: number) => {
+-      raf = requestAnimationFrame(tick);
+-      const dt = Math.min((now - last) / 1000, 0.05);
+-      last = now;
+-      if (!inView || document.hidden) return;
+-
+-      kick *= 0.9; // decay: the nudge is a reaction, not a permanent speed-up
+-      const drift = paused || stopped ? 0 : BASE;
+-      const react = stopped || reduced ? 0 : Math.abs(kick) * 1.6;
+-      const push = stopped || reduced ? 0 : kick * dir * dt * 4;
+-      x += (drift + react) * dir * dt + push;
+-
+-      if (setW > 0) {
+-        x %= setW;
+-        if (x > 0) x -= setW;   // normalise into (-setW, 0] for either direction
+-      }
+-      // a slight lean in the direction of travel reads as speed
+-      const skew = reduced ? 0 : Math.max(-3, Math.min(3, kick * dir * 0.05));
+-      tr.style.transform = `translate3d(${x}px, 0, 0) skewX(${skew.toFixed(2)}deg)`;
+-    };
+-    raf = requestAnimationFrame(tick);
+-
+-    return () => {
+-      cancelAnimationFrame(raf);
+-      ro.disconnect();
+-      io.disconnect();
+-      window.removeEventListener("scroll", onScroll);
+-      vp.removeEventListener("pointerenter", enter);
+-      vp.removeEventListener("pointerleave", leave);
+-      vp.removeEventListener("focusin", enter);
+-      vp.removeEventListener("focusout", leave);
+-    };
+-  }, [dir, rep, stopped, reduced]);
+-
+-  const run = Array.from({ length: rep }, (_, r) => tools.map((t) => ({ t, r }))).flat();
+-
+-  return (
+-    <div className="mq" ref={viewport} aria-hidden="true">
+-      <div className="mq-track" ref={track}>
+-        <ul className="mq-set" ref={probe}>
+-          {run.map(({ t, r }) => <Chip key={`a${r}-${t.name}`} t={t} />)}
+-        </ul>
+-        <ul className="mq-set">
+-          {run.map(({ t, r }) => <Chip key={`b${r}-${t.name}`} t={t} />)}
+-        </ul>
+-      </div>
+-    </div>
+-  );
+-}
+-
+-/**
+- * A continuously running strip of the tools in the stack.
+- *
+- * It runs continuously in every browser, including under a reduced-motion
+- * preference — slower and without the reactive flourishes there, but never
+- * frozen.
+- *
+- * There is no visible stop control, by the author's decision. Pointer hover and
+- * keyboard focus still halt the row under the cursor, which is the remaining way
+- * to stop it. The rows are hidden from assistive tech: every name already appears
+- * in the list above them, so nothing is lost by not announcing the repeats.
+- */
+-export default function SkillMarquee() {
+-  const reduced = useReducedMotion();
+-
+-  return (
+-    <div className="mq-wrap">
+-      <Row tools={ROW_A} dir={1} paused={false} reduced={reduced} />
+-      <Row tools={ROW_B} dir={-1} paused={false} reduced={reduced} />
+-    </div>
+-  );
+-}
+diff -ruN orig-src/components/GlowCursor.tsx p/src/components/GlowCursor.tsx
+--- orig-src/components/GlowCursor.tsx	2026-09-15 06:40:15.199747065 +0000
++++ p/src/components/GlowCursor.tsx	2026-09-15 06:40:44.742842437 +0000
+@@ -11,16 +11,16 @@
+     if (!el) return;
+ 
+     let x = innerWidth / 2, y = innerHeight / 2, cx = x, cy = y, raf = 0;
+-    const move = (e: PointerEvent) => { x = e.clientX; y = e.clientY; };
++    const onMove = (e: PointerEvent) => { x = e.clientX; y = e.clientY; };
+     const loop = () => {
+       cx += (x - cx) * 0.09;
+       cy += (y - cy) * 0.09;
+       el.style.transform = `translate3d(${cx}px, ${cy}px, 0)`;
+       raf = requestAnimationFrame(loop);
+     };
+-    window.addEventListener("pointermove", move, { passive: true });
++    window.addEventListener("pointermove", onMove, { passive: true });
+     loop();
+-    return () => { window.removeEventListener("pointermove", move); cancelAnimationFrame(raf); };
++    return () => { window.removeEventListener("pointermove", onMove); cancelAnimationFrame(raf); };
+   }, []);
+ 
+   return <div className="glow" ref={ref} aria-hidden="true" />;
+diff -ruN orig-src/components/Nav.tsx p/src/components/Nav.tsx
+--- orig-src/components/Nav.tsx	2026-09-15 06:40:15.199767854 +0000
++++ p/src/components/Nav.tsx	2026-09-15 06:40:44.742206539 +0000
+@@ -10,19 +10,19 @@
+   const panel = useRef<HTMLDivElement>(null);
+ 
+   useEffect(() => {
+-    const on = () => setScrolled(window.scrollY > 24);
+-    on();
+-    window.addEventListener("scroll", on, { passive: true });
+-    return () => window.removeEventListener("scroll", on);
++    const onScroll = () => setScrolled(window.scrollY > 24);
++    onScroll();
++    window.addEventListener("scroll", onScroll, { passive: true });
++    return () => window.removeEventListener("scroll", onScroll);
+   }, []);
+ 
+   useEffect(() => {
+     document.body.classList.toggle("locked", open);
+-    const esc = (e: KeyboardEvent) => { if (e.key === "Escape") setOpen(false); };
+-    window.addEventListener("keydown", esc);
++    const onKeyDown = (e: KeyboardEvent) => { if (e.key === "Escape") setOpen(false); };
++    window.addEventListener("keydown", onKeyDown);
+     return () => {
+       document.body.classList.remove("locked");
+-      window.removeEventListener("keydown", esc);
++      window.removeEventListener("keydown", onKeyDown);
+     };
+   }, [open]);
+ 
+diff -ruN orig-src/components/SkillMarquee.tsx p/src/components/SkillMarquee.tsx
+--- orig-src/components/SkillMarquee.tsx	2026-09-15 06:40:15.199817707 +0000
++++ p/src/components/SkillMarquee.tsx	2026-09-15 06:41:51.299825089 +0000
+@@ -39,8 +39,50 @@
+   );
+ }
+ 
+-function Row({ tools, dir, paused: stopped, reduced }: {
+-  tools: Tool[]; dir: 1 | -1; paused: boolean; reduced: boolean;
++/**
++ * Scroll velocity feeds the rail: the strip reacts to the reader's own input.
++ * `decay()` is called once per frame and returns the current nudge.
++ */
++function trackScrollKick() {
++  let lastScroll = window.scrollY;
++  let kick = 0;
++  const KICK_MAX = 55; // a nav-link jump scrolls thousands of px in one event —
++                       // without a clamp the strip lurches instead of reacting
++  const onScroll = () => {
++    const y = window.scrollY;
++    const d = Math.max(-KICK_MAX, Math.min(KICK_MAX, y - lastScroll));
++    kick = Math.max(-KICK_MAX, Math.min(KICK_MAX, kick + d * 0.9));
++    lastScroll = y;
++  };
++  window.addEventListener("scroll", onScroll, { passive: true });
++  return {
++    decay: () => (kick *= 0.9), // the nudge is a reaction, not a permanent speed-up
++    dispose: () => window.removeEventListener("scroll", onScroll),
++  };
++}
++
++/** Pointer hover or keyboard focus halts the row under it. */
++function bindHoverPause(vp: HTMLElement) {
++  let paused = false;
++  const enter = () => { paused = true; };
++  const leave = () => { paused = false; };
++  vp.addEventListener("pointerenter", enter);
++  vp.addEventListener("pointerleave", leave);
++  vp.addEventListener("focusin", enter);
++  vp.addEventListener("focusout", leave);
++  return {
++    isPaused: () => paused,
++    dispose: () => {
++      vp.removeEventListener("pointerenter", enter);
++      vp.removeEventListener("pointerleave", leave);
++      vp.removeEventListener("focusin", enter);
++      vp.removeEventListener("focusout", leave);
++    },
++  };
++}
++
++function Row({ tools, dir, reduced }: {
++  tools: Tool[]; dir: 1 | -1; reduced: boolean;
+ }) {
+   const viewport = useRef<HTMLDivElement>(null);
+   const track = useRef<HTMLDivElement>(null);
+@@ -80,31 +122,13 @@
+     let x = 0;
+     let raf = 0;
+     let last = performance.now();
+-    let paused = false;
+     let inView = false;
+-
+-    // scroll velocity feeds the rail: the strip reacts to the reader's own input
+-    let lastScroll = window.scrollY;
+-    let kick = 0;
+-    const KICK_MAX = 55; // a nav-link jump scrolls thousands of px in one event —
+-                         // without a clamp the strip lurches instead of reacting
+-    const onScroll = () => {
+-      const y = window.scrollY;
+-      const d = Math.max(-KICK_MAX, Math.min(KICK_MAX, y - lastScroll));
+-      kick = Math.max(-KICK_MAX, Math.min(KICK_MAX, kick + d * 0.9));
+-      lastScroll = y;
+-    };
+-    window.addEventListener("scroll", onScroll, { passive: true });
++    const kick = trackScrollKick();
+ 
+     const io = new IntersectionObserver(([e]) => { inView = e.isIntersecting; }, { threshold: 0 });
+     io.observe(vp);
+ 
+-    const enter = () => { paused = true; };
+-    const leave = () => { paused = false; };
+-    vp.addEventListener("pointerenter", enter);
+-    vp.addEventListener("pointerleave", leave);
+-    vp.addEventListener("focusin", enter);
+-    vp.addEventListener("focusout", leave);
++    const hover = bindHoverPause(vp);
+ 
+     // The strip runs continuously for everyone; a reduced-motion preference
+     // only makes it slower and drops the reactive flourishes.
+@@ -116,10 +140,10 @@
+       last = now;
+       if (!inView || document.hidden) return;
+ 
+-      kick *= 0.9; // decay: the nudge is a reaction, not a permanent speed-up
+-      const drift = paused || stopped ? 0 : BASE;
+-      const react = stopped || reduced ? 0 : Math.abs(kick) * 1.6;
+-      const push = stopped || reduced ? 0 : kick * dir * dt * 4;
++      const k = kick.decay();
++      const drift = hover.isPaused() ? 0 : BASE;
++      const react = reduced ? 0 : Math.abs(k) * 1.6;
++      const push = reduced ? 0 : k * dir * dt * 4;
+       x += (drift + react) * dir * dt + push;
+ 
+       if (setW > 0) {
+@@ -127,7 +151,7 @@
+         if (x > 0) x -= setW;   // normalise into (-setW, 0] for either direction
+       }
+       // a slight lean in the direction of travel reads as speed
+-      const skew = reduced ? 0 : Math.max(-3, Math.min(3, kick * dir * 0.05));
++      const skew = reduced ? 0 : Math.max(-3, Math.min(3, k * dir * 0.05));
+       tr.style.transform = `translate3d(${x}px, 0, 0) skewX(${skew.toFixed(2)}deg)`;
+     };
+     raf = requestAnimationFrame(tick);
+@@ -136,13 +160,10 @@
+       cancelAnimationFrame(raf);
+       ro.disconnect();
+       io.disconnect();
+-      window.removeEventListener("scroll", onScroll);
+-      vp.removeEventListener("pointerenter", enter);
+-      vp.removeEventListener("pointerleave", leave);
+-      vp.removeEventListener("focusin", enter);
+-      vp.removeEventListener("focusout", leave);
++      kick.dispose();
++      hover.dispose();
+     };
+-  }, [dir, rep, stopped, reduced]);
++  }, [dir, rep, reduced]);
+ 
+   const run = Array.from({ length: rep }, (_, r) => tools.map((t) => ({ t, r }))).flat();
+ 
+@@ -177,8 +198,8 @@
+ 
+   return (
+     <div className="mq-wrap">
+-      <Row tools={ROW_A} dir={1} paused={false} reduced={reduced} />
+-      <Row tools={ROW_B} dir={-1} paused={false} reduced={reduced} />
++      <Row tools={ROW_A} dir={1} reduced={reduced} />
++      <Row tools={ROW_B} dir={-1} reduced={reduced} />
+     </div>
+   );
+ }
+diff -ruN orig-src/components/ToTop.tsx p/src/components/ToTop.tsx
+--- orig-src/components/ToTop.tsx	2026-09-15 06:40:15.199829221 +0000
++++ p/src/components/ToTop.tsx	2026-09-15 06:40:44.742336735 +0000
+@@ -5,10 +5,10 @@
+   const [show, setShow] = useState(false);
+ 
+   useEffect(() => {
+-    const on = () => setShow(window.scrollY > innerHeight);
+-    on();
+-    window.addEventListener("scroll", on, { passive: true });
+-    return () => window.removeEventListener("scroll", on);
++    const onScroll = () => setShow(window.scrollY > innerHeight);
++    onScroll();
++    window.addEventListener("scroll", onScroll, { passive: true });
++    return () => window.removeEventListener("scroll", onScroll);
+   }, []);
+ 
+   return (
+diff -ruN orig-src/data.ts p/src/data.ts
+--- orig-src/data.ts	2026-09-15 06:40:15.198987926 +0000
++++ p/src/data.ts	2026-09-15 06:40:54.786391007 +0000
+@@ -2,7 +2,6 @@
+   name: "Do Tan Tuong",
+   short: "Tuong",
+   role: "Intern Fullstack Developer",
+-  title: "Fullstack Developer",
+   company: "Dekon",
+   age: 22,
+   location: "Ho Chi Minh City, Vietnam",
+@@ -48,23 +47,23 @@
+   when: "Present",
+   items: [
+     {
+-      h: "Shipping features end to end",
+-      p: "Built product features from the ReactJS/NextJS interface down to REST APIs on NodeJS — reusable components, state handling, and a direct line into the data layer.",
++      heading: "Shipping features end to end",
++      summary: "Built product features from the ReactJS/NextJS interface down to REST APIs on NodeJS — reusable components, state handling, and a direct line into the data layer.",
+       stack: ["ReactJS", "NextJS", "TypeScript", "NodeJS"],
+     },
+     {
+-      h: "Designing and querying data",
+-      p: "Worked across PostgreSQL and MongoDB: schema design, query tuning, and normalising data so it serves both the app and the reporting layer.",
++      heading: "Designing and querying data",
++      summary: "Worked across PostgreSQL and MongoDB: schema design, query tuning, and normalising data so it serves both the app and the reporting layer.",
+       stack: ["PostgreSQL", "MongoDB", "Python"],
+     },
+     {
+-      h: "Measurement and reporting",
+-      p: "Built Power BI dashboards and configured GA4 to track real user behaviour — turning raw numbers into something the team can decide on.",
++      heading: "Measurement and reporting",
++      summary: "Built Power BI dashboards and configured GA4 to track real user behaviour — turning raw numbers into something the team can decide on.",
+       stack: ["Power BI", "GA4"],
+     },
+     {
+-      h: "Packaging and deployment",
+-      p: "Containerised services with Docker and kept dev and staging in sync, so deploys became repeatable instead of risky.",
++      heading: "Packaging and deployment",
++      summary: "Containerised services with Docker and kept dev and staging in sync, so deploys became repeatable instead of risky.",
+       stack: ["Docker", "CI/CD"],
+     },
+   ],
+@@ -117,13 +116,13 @@
+ 
+ export const EDUCATION = [
+   {
+-    yr: "Bachelor",
+-    h: "Bachelor of Information Technology",
+-    p: "Grounding in data structures, algorithms, databases and software engineering — the base for how I approach every product problem.",
++    kind: "Bachelor",
++    heading: "Bachelor of Information Technology",
++    summary: "Grounding in data structures, algorithms, databases and software engineering — the base for how I approach every product problem.",
+   },
+   {
+-    yr: "Self-taught",
+-    h: "Fullstack & Data",
+-    p: "Learning through real projects: React and Next on the front, NodeJS on the API, Power BI and GA4 at the measurement layer.",
++    kind: "Self-taught",
++    heading: "Fullstack & Data",
++    summary: "Learning through real projects: React and Next on the front, NodeJS on the API, Power BI and GA4 at the measurement layer.",
+   },
+ ];
+diff -ruN orig-src/hooks.ts p/src/hooks.ts
+--- orig-src/hooks.ts	2026-09-15 06:40:15.199244610 +0000
++++ p/src/hooks.ts	2026-09-15 06:40:44.742637519 +0000
+@@ -11,9 +11,9 @@
+   );
+   useEffect(() => {
+     const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
+-    const on = () => setReduced(mq.matches);
+-    mq.addEventListener?.("change", on);
+-    return () => mq.removeEventListener?.("change", on);
++    const onChange = () => setReduced(mq.matches);
++    mq.addEventListener?.("change", onChange);
++    return () => mq.removeEventListener?.("change", onChange);
+   }, []);
+   return reduced;
+ }
+diff -ruN orig-src/sections/Education.tsx p/src/sections/Education.tsx
+--- orig-src/sections/Education.tsx	2026-09-15 06:40:15.199410509 +0000
++++ p/src/sections/Education.tsx	2026-09-15 06:40:54.786759933 +0000
+@@ -10,11 +10,11 @@
+ 
+         <div className="edu">
+           {EDUCATION.map((e, i) => (
+-            <Reveal key={e.h} delay={60 + i * 70}>
++            <Reveal key={e.heading} delay={60 + i * 70}>
+               <div className="edu-card">
+-                <p className="yr">{e.yr}</p>
+-                <h3>{e.h}</h3>
+-                <p>{e.p}</p>
++                <p className="yr">{e.kind}</p>
++                <h3>{e.heading}</h3>
++                <p>{e.summary}</p>
+               </div>
+             </Reveal>
+           ))}
+diff -ruN orig-src/sections/Experience.tsx p/src/sections/Experience.tsx
+--- orig-src/sections/Experience.tsx	2026-09-15 06:40:15.199421716 +0000
++++ p/src/sections/Experience.tsx	2026-09-15 06:41:30.763132139 +0000
+@@ -1,5 +1,6 @@
+ import { useCallback, useState } from "react";
+-import PipelineScene, { STAGES } from "../three/PipelineScene";
++import PipelineScene from "../three/PipelineScene";
++import { STAGES } from "../three/pipelineStages";
+ import Reveal from "../components/Reveal";
+ import Section from "../components/Section";
+ import { EXPERIENCE } from "../data";
+@@ -42,10 +43,10 @@
+ 
+           <div className="xp-body">
+             {EXPERIENCE.items.map((it, i) => (
+-              <Reveal key={it.h} delay={80 + i * 60}>
++              <Reveal key={it.heading} delay={80 + i * 60}>
+                 <article className="xp-item">
+-                  <h4>{it.h}</h4>
+-                  <p>{it.p}</p>
++                  <h4>{it.heading}</h4>
++                  <p>{it.summary}</p>
+                   <ul className="stack">
+                     {it.stack.map((s) => <li key={s}>{s}</li>)}
+                   </ul>
+diff -ruN orig-src/three/PipelineScene.tsx p/src/three/PipelineScene.tsx
+--- orig-src/three/PipelineScene.tsx	2026-09-15 06:40:15.200224440 +0000
++++ p/src/three/PipelineScene.tsx	2026-09-15 06:41:30.762907680 +0000
+@@ -1,5 +1,7 @@
+ import { useEffect, useRef, useState } from "react";
+ import * as THREE from "three";
++import { STAGES } from "./pipelineStages";
++import { GLOW_FRAG, GLOW_VERT, RAIL_FRAG, RAIL_VERT } from "./pipelineShaders";
+ 
+ /**
+  * The authored focal moment of the page.
+@@ -10,22 +12,12 @@
+  * until the run completes. The motion explains the pipeline; it is not decoration.
+  */
+ 
+-export type Stage = { id: string; title: string; sub: string };
+-
+-export const STAGES: Stage[] = [
+-  { id: "ui", title: "Browser", sub: "React · Next.js" },
+-  { id: "api", title: "API", sub: "Node.js · REST" },
+-  { id: "db", title: "Database", sub: "PostgreSQL · MongoDB" },
+-  { id: "ship", title: "Docker", sub: "Build · Deploy" },
+-  { id: "data", title: "Insight", sub: "Power BI · GA4" },
+-];
+-
+ type Marker = { id: string; x: number; y: number; on: boolean; side: "top" | "bottom" | "right" };
+ 
+ export default function PipelineScene({ onStage }: { onStage?: (i: number) => void }) {
+   const host = useRef<HTMLDivElement>(null);
+-  const cb = useRef(onStage);
+-  cb.current = onStage;
++  const onStageRef = useRef(onStage);
++  onStageRef.current = onStage;
+   const [markers, setMarkers] = useState<Marker[]>([]);
+ 
+   useEffect(() => {
+@@ -109,23 +101,8 @@
+       transparent: true,
+       depthWrite: false,
+       uniforms: { uHead: { value: 0 }, uA: { value: new THREE.Color("#3ddc84") } },
+-      vertexShader: `
+-        attribute float aProg;
+-        varying float vP;
+-        void main(){
+-          vP = aProg;
+-          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+-        }`,
+-      fragmentShader: `
+-        uniform float uHead;
+-        uniform vec3 uA;
+-        varying float vP;
+-        void main(){
+-          float lit  = step(vP, uHead);                       // already travelled
+-          float glow = smoothstep(0.07, 0.0, abs(vP - uHead)); // the packet's wake
+-          float a = 0.20 + lit * 0.40 + glow * 0.80;
+-          gl_FragColor = vec4(mix(uA * 0.55, uA, lit + glow), a);
+-        }`,
++      vertexShader: RAIL_VERT,
++      fragmentShader: RAIL_FRAG,
+     });
+     const rail = new THREE.Line(railGeo, railMat);
+     group.add(rail);
+@@ -145,20 +122,8 @@
+         blending: THREE.AdditiveBlending,
+         side: THREE.BackSide,
+         uniforms: {},
+-        vertexShader: `
+-          varying vec3 vN; varying vec3 vV;
+-          void main(){
+-            vN = normalize(normalMatrix * normal);
+-            vec4 mv = modelViewMatrix * vec4(position,1.0);
+-            vV = -mv.xyz;
+-            gl_Position = projectionMatrix * mv;
+-          }`,
+-        fragmentShader: `
+-          varying vec3 vN; varying vec3 vV;
+-          void main(){
+-            float f = pow(1.0 - abs(dot(normalize(vV), vN)), 2.0);
+-            gl_FragColor = vec4(vec3(0.35, 0.95, 0.6) * f, f * 0.6);
+-          }`,
++        vertexShader: GLOW_VERT,
++        fragmentShader: GLOW_FRAG,
+       })
+     );
+     group.add(packetGlow);
+@@ -223,8 +188,8 @@
+       aim.x = ((e.clientX - r.left) / r.width - 0.5) * 2;
+       aim.y = ((e.clientY - r.top) / r.height - 0.5) * 2;
+     };
+-    const fine = window.matchMedia("(hover: hover)").matches;
+-    if (fine) el.addEventListener("pointermove", onMove, { passive: true });
++    const canHover = window.matchMedia("(hover: hover)").matches;
++    if (canHover) el.addEventListener("pointermove", onMove, { passive: true });
+ 
+     // ── run the pipeline ─────────────────────────────────────────────────
+     let inView = false;
+@@ -284,7 +249,7 @@
+         const at = i / (N - 1);
+         if (head >= at && !fired[i]) {
+           fired[i] = t;
+-          if (i !== lastStage) { lastStage = i; cb.current?.(i); }
++          if (i !== lastStage) { lastStage = i; onStageRef.current?.(i); }
+         }
+         const since = fired[i] ? t - fired[i] : 99;
+         const hit = Math.max(0, 1 - since / 0.85);
+@@ -322,7 +287,7 @@
+       cancelAnimationFrame(raf);
+       ro.disconnect();
+       io.disconnect();
+-      if (fine) el.removeEventListener("pointermove", onMove);
++      if (canHover) el.removeEventListener("pointermove", onMove);
+       scene.traverse((o) => {
+         const m = o as THREE.Mesh;
+         m.geometry?.dispose?.();
+diff -ruN orig-src/three/SkillsOrb.tsx p/src/three/SkillsOrb.tsx
+--- orig-src/three/SkillsOrb.tsx	2026-09-15 06:40:15.200297098 +0000
++++ p/src/three/SkillsOrb.tsx	2026-09-15 06:41:11.376206705 +0000
+@@ -1,11 +1,84 @@
+ import { useEffect, useRef, useState } from "react";
+ import * as THREE from "three";
+ 
+-export const SKILLS = [
++const SKILLS = [
+   "Python", "JavaScript", "TypeScript", "PostgreSQL", "MongoDB",
+   "Node.js", "React", "Next.js", "Docker", "Power BI", "GA4",
+ ];
+ 
++/** Ambient fill plus a green key and orange rim, for the node material. */
++function addLights(scene: THREE.Scene) {
++  scene.add(new THREE.AmbientLight(0xffffff, 0.55));
++  const key = new THREE.PointLight(0x3ddc84, 45, 30);
++  key.position.set(4, 5, 6);
++  scene.add(key);
++  const rim = new THREE.PointLight(0xff5c26, 22, 30);
++  rim.position.set(-5, -3, -4);
++  scene.add(rim);
++}
++
++/** Two wireframe icosahedra around the orb. */
++function buildCages(group: THREE.Group) {
++  const cage = new THREE.Mesh(
++    new THREE.IcosahedronGeometry(2.55, 1),
++    new THREE.MeshBasicMaterial({ color: 0x3ddc84, wireframe: true, transparent: true, opacity: 0.11 })
++  );
++  group.add(cage);
++
++  const cage2 = new THREE.Mesh(
++    new THREE.IcosahedronGeometry(2.05, 0),
++    new THREE.MeshBasicMaterial({ color: 0xffffff, wireframe: true, transparent: true, opacity: 0.05 })
++  );
++  group.add(cage2);
++  return { cage, cage2 };
++}
++
++/** One node per skill on a fibonacci sphere, plus the spokes to the centre. */
++function buildNodes(group: THREE.Group) {
++  const R = 2.55;
++  const N = SKILLS.length;
++  const nodeGeo = new THREE.SphereGeometry(0.145, 20, 20);
++  const nodes: THREE.Mesh[] = [];
++  const linePts: number[] = [];
++
++  for (let i = 0; i < N; i++) {
++    const y = 1 - (i / (N - 1)) * 2;
++    const r = Math.sqrt(Math.max(0, 1 - y * y));
++    const th = Math.PI * (3 - Math.sqrt(5)) * i;
++    const p = new THREE.Vector3(Math.cos(th) * r, y, Math.sin(th) * r).multiplyScalar(R);
++
++    const mat = new THREE.MeshStandardMaterial({
++      color: i % 3 === 0 ? 0xff5c26 : 0x3ddc84,
++      emissive: i % 3 === 0 ? 0x5a1c07 : 0x0c3b22,
++      roughness: 0.32,
++      metalness: 0.25,
++    });
++    const m = new THREE.Mesh(nodeGeo, mat);
++    m.position.copy(p);
++    m.userData = { skill: SKILLS[i], base: p.clone(), idx: i };
++    group.add(m);
++    nodes.push(m);
++
++    linePts.push(0, 0, 0, p.x, p.y, p.z);
++  }
++
++  const lines = new THREE.LineSegments(
++    new THREE.BufferGeometry().setAttribute("position", new THREE.Float32BufferAttribute(linePts, 3)),
++    new THREE.LineBasicMaterial({ color: 0x3ddc84, transparent: true, opacity: 0.14 })
++  );
++  group.add(lines);
++  return nodes;
++}
++
++function buildHeart(group: THREE.Group) {
++  const heart = new THREE.Mesh(
++    new THREE.IcosahedronGeometry(0.42, 2),
++    new THREE.MeshStandardMaterial({ color: 0x0f1512, emissive: 0x0e6b3c, roughness: 0.25, metalness: 0.6 })
++  );
++  group.add(heart);
++  return heart;
++}
++
+ /**
+  * Interactive "tech constellation": skill nodes placed on a sphere with a
+  * fibonacci distribution, wrapped in a wireframe icosahedron, drag to spin,
+@@ -39,66 +112,15 @@
+     scene.add(group);
+ 
+     // lights (for the node material)
+-    scene.add(new THREE.AmbientLight(0xffffff, 0.55));
+-    const key = new THREE.PointLight(0x3ddc84, 45, 30);
+-    key.position.set(4, 5, 6);
+-    scene.add(key);
+-    const rim = new THREE.PointLight(0xff5c26, 22, 30);
+-    rim.position.set(-5, -3, -4);
+-    scene.add(rim);
++    addLights(scene);
+ 
+     // wireframe cage
+-    const cage = new THREE.Mesh(
+-      new THREE.IcosahedronGeometry(2.55, 1),
+-      new THREE.MeshBasicMaterial({ color: 0x3ddc84, wireframe: true, transparent: true, opacity: 0.11 })
+-    );
+-    group.add(cage);
+-
+-    const cage2 = new THREE.Mesh(
+-      new THREE.IcosahedronGeometry(2.05, 0),
+-      new THREE.MeshBasicMaterial({ color: 0xffffff, wireframe: true, transparent: true, opacity: 0.05 })
+-    );
+-    group.add(cage2);
++    const { cage, cage2 } = buildCages(group);
+ 
+     // nodes on a fibonacci sphere
+-    const R = 2.55;
+-    const N = SKILLS.length;
+-    const nodeGeo = new THREE.SphereGeometry(0.145, 20, 20);
+-    const nodes: THREE.Mesh[] = [];
+-    const linePts: number[] = [];
+-
+-    for (let i = 0; i < N; i++) {
+-      const y = 1 - (i / (N - 1)) * 2;
+-      const r = Math.sqrt(Math.max(0, 1 - y * y));
+-      const th = Math.PI * (3 - Math.sqrt(5)) * i;
+-      const p = new THREE.Vector3(Math.cos(th) * r, y, Math.sin(th) * r).multiplyScalar(R);
+-
+-      const mat = new THREE.MeshStandardMaterial({
+-        color: i % 3 === 0 ? 0xff5c26 : 0x3ddc84,
+-        emissive: i % 3 === 0 ? 0x5a1c07 : 0x0c3b22,
+-        roughness: 0.32,
+-        metalness: 0.25,
+-      });
+-      const m = new THREE.Mesh(nodeGeo, mat);
+-      m.position.copy(p);
+-      m.userData = { skill: SKILLS[i], base: p.clone(), idx: i };
+-      group.add(m);
+-      nodes.push(m);
+-
+-      linePts.push(0, 0, 0, p.x, p.y, p.z);
+-    }
++    const nodes = buildNodes(group);
+ 
+-    const lines = new THREE.LineSegments(
+-      new THREE.BufferGeometry().setAttribute("position", new THREE.Float32BufferAttribute(linePts, 3)),
+-      new THREE.LineBasicMaterial({ color: 0x3ddc84, transparent: true, opacity: 0.14 })
+-    );
+-    group.add(lines);
+-
+-    const heart = new THREE.Mesh(
+-      new THREE.IcosahedronGeometry(0.42, 2),
+-      new THREE.MeshStandardMaterial({ color: 0x0f1512, emissive: 0x0e6b3c, roughness: 0.25, metalness: 0.6 })
+-    );
+-    group.add(heart);
++    const heart = buildHeart(group);
+ 
+     // ── resize ───────────────────────────────────────────────────────────
+     const resize = () => {
+diff -ruN orig-src/three/pipelineShaders.ts p/src/three/pipelineShaders.ts
+--- orig-src/three/pipelineShaders.ts	1970-01-01 00:00:00.000000000 +0000
++++ p/src/three/pipelineShaders.ts	2026-09-15 06:41:30.763083597 +0000
+@@ -0,0 +1,36 @@
++/* GLSL for PipelineScene: the progressively lit rail and the packet's fresnel glow. */
++
++export const RAIL_VERT = /* glsl */ `
++        attribute float aProg;
++        varying float vP;
++        void main(){
++          vP = aProg;
++          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
++        }`;
++
++export const RAIL_FRAG = /* glsl */ `
++        uniform float uHead;
++        uniform vec3 uA;
++        varying float vP;
++        void main(){
++          float lit  = step(vP, uHead);                       // already travelled
++          float glow = smoothstep(0.07, 0.0, abs(vP - uHead)); // the packet's wake
++          float a = 0.20 + lit * 0.40 + glow * 0.80;
++          gl_FragColor = vec4(mix(uA * 0.55, uA, lit + glow), a);
++        }`;
++
++export const GLOW_VERT = /* glsl */ `
++          varying vec3 vN; varying vec3 vV;
++          void main(){
++            vN = normalize(normalMatrix * normal);
++            vec4 mv = modelViewMatrix * vec4(position,1.0);
++            vV = -mv.xyz;
++            gl_Position = projectionMatrix * mv;
++          }`;
++
++export const GLOW_FRAG = /* glsl */ `
++          varying vec3 vN; varying vec3 vV;
++          void main(){
++            float f = pow(1.0 - abs(dot(normalize(vV), vN)), 2.0);
++            gl_FragColor = vec4(vec3(0.35, 0.95, 0.6) * f, f * 0.6);
++          }`;
+diff -ruN orig-src/three/pipelineStages.ts p/src/three/pipelineStages.ts
+--- orig-src/three/pipelineStages.ts	1970-01-01 00:00:00.000000000 +0000
++++ p/src/three/pipelineStages.ts	2026-09-15 06:41:30.763023875 +0000
+@@ -0,0 +1,10 @@
++/** The layers a request passes through, in order — shared by the scene and its legend. */
++export type Stage = { id: string; title: string; sub: string };
++
++export const STAGES: Stage[] = [
++  { id: "ui", title: "Browser", sub: "React · Next.js" },
++  { id: "api", title: "API", sub: "Node.js · REST" },
++  { id: "db", title: "Database", sub: "PostgreSQL · MongoDB" },
++  { id: "ship", title: "Docker", sub: "Build · Deploy" },
++  { id: "data", title: "Insight", sub: "Power BI · GA4" },
++];
