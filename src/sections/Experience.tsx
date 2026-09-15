@@ -42,10 +42,10 @@ export default function Experience() {
 
           <div className="xp-body">
             {EXPERIENCE.items.map((it, i) => (
-              <Reveal key={it.h} delay={80 + i * 60}>
+              <Reveal key={it.heading} delay={80 + i * 60}>
                 <article className="xp-item">
-                  <h4>{it.h}</h4>
-                  <p>{it.p}</p>
+                  <h4>{it.heading}</h4>
+                  <p>{it.summary}</p>
                   <ul className="stack">
                     {it.stack.map((s) => <li key={s}>{s}</li>)}
                   </ul>

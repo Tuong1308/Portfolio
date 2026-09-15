@@ -24,8 +24,8 @@ type Marker = { id: string; x: number; y: number; on: boolean; side: "top" | "bo
 
 export default function PipelineScene({ onStage }: { onStage?: (i: number) => void }) {
   const host = useRef<HTMLDivElement>(null);
-  const cb = useRef(onStage);
-  cb.current = onStage;
+  const onStageRef = useRef(onStage);
+  onStageRef.current = onStage;
   const [markers, setMarkers] = useState<Marker[]>([]);
 
   useEffect(() => {
@@ -223,8 +223,8 @@ export default function PipelineScene({ onStage }: { onStage?: (i: number) => vo
       aim.x = ((e.clientX - r.left) / r.width - 0.5) * 2;
       aim.y = ((e.clientY - r.top) / r.height - 0.5) * 2;
     };
-    const fine = window.matchMedia("(hover: hover)").matches;
-    if (fine) el.addEventListener("pointermove", onMove, { passive: true });
+    const canHover = window.matchMedia("(hover: hover)").matches;
+    if (canHover) el.addEventListener("pointermove", onMove, { passive: true });
 
     // ── run the pipeline ─────────────────────────────────────────────────
     let inView = false;
@@ -284,7 +284,7 @@ export default function PipelineScene({ onStage }: { onStage?: (i: number) => vo
         const at = i / (N - 1);
         if (head >= at && !fired[i]) {
           fired[i] = t;
-          if (i !== lastStage) { lastStage = i; cb.current?.(i); }
+          if (i !== lastStage) { lastStage = i; onStageRef.current?.(i); }
         }
         const since = fired[i] ? t - fired[i] : 99;
         const hit = Math.max(0, 1 - since / 0.85);
@@ -322,7 +322,7 @@ export default function PipelineScene({ onStage }: { onStage?: (i: number) => vo
       cancelAnimationFrame(raf);
       ro.disconnect();
       io.disconnect();
-      if (fine) el.removeEventListener("pointermove", onMove);
+      if (canHover) el.removeEventListener("pointermove", onMove);
       scene.traverse((o) => {
         const m = o as THREE.Mesh;
         m.geometry?.dispose?.();

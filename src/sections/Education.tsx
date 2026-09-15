@@ -10,11 +10,11 @@ export default function Education() {
 
         <div className="edu">
           {EDUCATION.map((e, i) => (
-            <Reveal key={e.h} delay={60 + i * 70}>
+            <Reveal key={e.heading} delay={60 + i * 70}>
               <div className="edu-card">
-                <p className="yr">{e.yr}</p>
-                <h3>{e.h}</h3>
-                <p>{e.p}</p>
+                <p className="yr">{e.kind}</p>
+                <h3>{e.heading}</h3>
+                <p>{e.summary}</p>
               </div>
             </Reveal>
           ))}

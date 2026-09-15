@@ -10,19 +10,19 @@ export default function Nav() {
   const panel = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const on = () => setScrolled(window.scrollY > 24);
-    on();
-    window.addEventListener("scroll", on, { passive: true });
-    return () => window.removeEventListener("scroll", on);
+    const onScroll = () => setScrolled(window.scrollY > 24);
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
   useEffect(() => {
     document.body.classList.toggle("locked", open);
-    const esc = (e: KeyboardEvent) => { if (e.key === "Escape") setOpen(false); };
-    window.addEventListener("keydown", esc);
+    const onKeyDown = (e: KeyboardEvent) => { if (e.key === "Escape") setOpen(false); };
+    window.addEventListener("keydown", onKeyDown);
     return () => {
       document.body.classList.remove("locked");
-      window.removeEventListener("keydown", esc);
+      window.removeEventListener("keydown", onKeyDown);
     };
   }, [open]);
 

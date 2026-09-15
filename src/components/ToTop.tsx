@@ -5,10 +5,10 @@ export default function ToTop() {
   const [show, setShow] = useState(false);
 
   useEffect(() => {
-    const on = () => setShow(window.scrollY > innerHeight);
-    on();
-    window.addEventListener("scroll", on, { passive: true });
-    return () => window.removeEventListener("scroll", on);
+    const onScroll = () => setShow(window.scrollY > innerHeight);
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
   return (
