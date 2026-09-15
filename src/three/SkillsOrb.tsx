@@ -6,6 +6,79 @@ const SKILLS = [
   "Node.js", "React", "Next.js", "Docker", "Power BI", "GA4",
 ];
 
+/** Ambient fill plus a green key and orange rim, for the node material. */
+function addLights(scene: THREE.Scene) {
+  scene.add(new THREE.AmbientLight(0xffffff, 0.55));
+  const key = new THREE.PointLight(0x3ddc84, 45, 30);
+  key.position.set(4, 5, 6);
+  scene.add(key);
+  const rim = new THREE.PointLight(0xff5c26, 22, 30);
+  rim.position.set(-5, -3, -4);
+  scene.add(rim);
+}
+
+/** Two wireframe icosahedra around the orb. */
+function buildCages(group: THREE.Group) {
+  const cage = new THREE.Mesh(
+    new THREE.IcosahedronGeometry(2.55, 1),
+    new THREE.MeshBasicMaterial({ color: 0x3ddc84, wireframe: true, transparent: true, opacity: 0.11 })
+  );
+  group.add(cage);
+
+  const cage2 = new THREE.Mesh(
+    new THREE.IcosahedronGeometry(2.05, 0),
+    new THREE.MeshBasicMaterial({ color: 0xffffff, wireframe: true, transparent: true, opacity: 0.05 })
+  );
+  group.add(cage2);
+  return { cage, cage2 };
+}
+
+/** One node per skill on a fibonacci sphere, plus the spokes to the centre. */
+function buildNodes(group: THREE.Group) {
+  const R = 2.55;
+  const N = SKILLS.length;
+  const nodeGeo = new THREE.SphereGeometry(0.145, 20, 20);
+  const nodes: THREE.Mesh[] = [];
+  const linePts: number[] = [];
+
+  for (let i = 0; i < N; i++) {
+    const y = 1 - (i / (N - 1)) * 2;
+    const r = Math.sqrt(Math.max(0, 1 - y * y));
+    const th = Math.PI * (3 - Math.sqrt(5)) * i;
+    const p = new THREE.Vector3(Math.cos(th) * r, y, Math.sin(th) * r).multiplyScalar(R);
+
+    const mat = new THREE.MeshStandardMaterial({
+      color: i % 3 === 0 ? 0xff5c26 : 0x3ddc84,
+      emissive: i % 3 === 0 ? 0x5a1c07 : 0x0c3b22,
+      roughness: 0.32,
+      metalness: 0.25,
+    });
+    const m = new THREE.Mesh(nodeGeo, mat);
+    m.position.copy(p);
+    m.userData = { skill: SKILLS[i], base: p.clone(), idx: i };
+    group.add(m);
+    nodes.push(m);
+
+    linePts.push(0, 0, 0, p.x, p.y, p.z);
+  }
+
+  const lines = new THREE.LineSegments(
+    new THREE.BufferGeometry().setAttribute("position", new THREE.Float32BufferAttribute(linePts, 3)),
+    new THREE.LineBasicMaterial({ color: 0x3ddc84, transparent: true, opacity: 0.14 })
+  );
+  group.add(lines);
+  return nodes;
+}
+
+function buildHeart(group: THREE.Group) {
+  const heart = new THREE.Mesh(
+    new THREE.IcosahedronGeometry(0.42, 2),
+    new THREE.MeshStandardMaterial({ color: 0x0f1512, emissive: 0x0e6b3c, roughness: 0.25, metalness: 0.6 })
+  );
+  group.add(heart);
+  return heart;
+}
+
 /**
  * Interactive "tech constellation": skill nodes placed on a sphere with a
  * fibonacci distribution, wrapped in a wireframe icosahedron, drag to spin,
@@ -39,66 +112,15 @@ export default function SkillsOrb() {
     scene.add(group);
 
     // lights (for the node material)
-    scene.add(new THREE.AmbientLight(0xffffff, 0.55));
-    const key = new THREE.PointLight(0x3ddc84, 45, 30);
-    key.position.set(4, 5, 6);
-    scene.add(key);
-    const rim = new THREE.PointLight(0xff5c26, 22, 30);
-    rim.position.set(-5, -3, -4);
-    scene.add(rim);
+    addLights(scene);
 
     // wireframe cage
-    const cage = new THREE.Mesh(
-      new THREE.IcosahedronGeometry(2.55, 1),
-      new THREE.MeshBasicMaterial({ color: 0x3ddc84, wireframe: true, transparent: true, opacity: 0.11 })
-    );
-    group.add(cage);
-
-    const cage2 = new THREE.Mesh(
-      new THREE.IcosahedronGeometry(2.05, 0),
-      new THREE.MeshBasicMaterial({ color: 0xffffff, wireframe: true, transparent: true, opacity: 0.05 })
-    );
-    group.add(cage2);
+    const { cage, cage2 } = buildCages(group);
 
     // nodes on a fibonacci sphere
-    const R = 2.55;
-    const N = SKILLS.length;
-    const nodeGeo = new THREE.SphereGeometry(0.145, 20, 20);
-    const nodes: THREE.Mesh[] = [];
-    const linePts: number[] = [];
+    const nodes = buildNodes(group);
 
-    for (let i = 0; i < N; i++) {
-      const y = 1 - (i / (N - 1)) * 2;
-      const r = Math.sqrt(Math.max(0, 1 - y * y));
-      const th = Math.PI * (3 - Math.sqrt(5)) * i;
-      const p = new THREE.Vector3(Math.cos(th) * r, y, Math.sin(th) * r).multiplyScalar(R);
-
-      const mat = new THREE.MeshStandardMaterial({
-        color: i % 3 === 0 ? 0xff5c26 : 0x3ddc84,
-        emissive: i % 3 === 0 ? 0x5a1c07 : 0x0c3b22,
-        roughness: 0.32,
-        metalness: 0.25,
-      });
-      const m = new THREE.Mesh(nodeGeo, mat);
-      m.position.copy(p);
-      m.userData = { skill: SKILLS[i], base: p.clone(), idx: i };
-      group.add(m);
-      nodes.push(m);
-
-      linePts.push(0, 0, 0, p.x, p.y, p.z);
-    }
-
-    const lines = new THREE.LineSegments(
-      new THREE.BufferGeometry().setAttribute("position", new THREE.Float32BufferAttribute(linePts, 3)),
-      new THREE.LineBasicMaterial({ color: 0x3ddc84, transparent: true, opacity: 0.14 })
-    );
-    group.add(lines);
-
-    const heart = new THREE.Mesh(
-      new THREE.IcosahedronGeometry(0.42, 2),
-      new THREE.MeshStandardMaterial({ color: 0x0f1512, emissive: 0x0e6b3c, roughness: 0.25, metalness: 0.6 })
-    );
-    group.add(heart);
+    const heart = buildHeart(group);
 
     // ── resize ───────────────────────────────────────────────────────────
     const resize = () => {

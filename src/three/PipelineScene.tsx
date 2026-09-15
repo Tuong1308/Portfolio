@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
+import { STAGES } from "./pipelineStages";
+import { GLOW_FRAG, GLOW_VERT, RAIL_FRAG, RAIL_VERT } from "./pipelineShaders";
 
 /**
  * The authored focal moment of the page.
@@ -9,16 +11,6 @@ import * as THREE from "three";
  * node fires as the packet lands on it, and the connector behind it stays lit
  * until the run completes. The motion explains the pipeline; it is not decoration.
  */
-
-type Stage = { id: string; title: string; sub: string };
-
-export const STAGES: Stage[] = [
-  { id: "ui", title: "Browser", sub: "React · Next.js" },
-  { id: "api", title: "API", sub: "Node.js · REST" },
-  { id: "db", title: "Database", sub: "PostgreSQL · MongoDB" },
-  { id: "ship", title: "Docker", sub: "Build · Deploy" },
-  { id: "data", title: "Insight", sub: "Power BI · GA4" },
-];
 
 type Marker = { id: string; x: number; y: number; on: boolean; side: "top" | "bottom" | "right" };
 
@@ -109,23 +101,8 @@ export default function PipelineScene({ onStage }: { onStage?: (i: number) => vo
       transparent: true,
       depthWrite: false,
       uniforms: { uHead: { value: 0 }, uA: { value: new THREE.Color("#3ddc84") } },
-      vertexShader: `
-        attribute float aProg;
-        varying float vP;
-        void main(){
-          vP = aProg;
-          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-        }`,
-      fragmentShader: `
-        uniform float uHead;
-        uniform vec3 uA;
-        varying float vP;
-        void main(){
-          float lit  = step(vP, uHead);                       // already travelled
-          float glow = smoothstep(0.07, 0.0, abs(vP - uHead)); // the packet's wake
-          float a = 0.20 + lit * 0.40 + glow * 0.80;
-          gl_FragColor = vec4(mix(uA * 0.55, uA, lit + glow), a);
-        }`,
+      vertexShader: RAIL_VERT,
+      fragmentShader: RAIL_FRAG,
     });
     const rail = new THREE.Line(railGeo, railMat);
     group.add(rail);
@@ -145,20 +122,8 @@ export default function PipelineScene({ onStage }: { onStage?: (i: number) => vo
         blending: THREE.AdditiveBlending,
         side: THREE.BackSide,
         uniforms: {},
-        vertexShader: `
-          varying vec3 vN; varying vec3 vV;
-          void main(){
-            vN = normalize(normalMatrix * normal);
-            vec4 mv = modelViewMatrix * vec4(position,1.0);
-            vV = -mv.xyz;
-            gl_Position = projectionMatrix * mv;
-          }`,
-        fragmentShader: `
-          varying vec3 vN; varying vec3 vV;
-          void main(){
-            float f = pow(1.0 - abs(dot(normalize(vV), vN)), 2.0);
-            gl_FragColor = vec4(vec3(0.35, 0.95, 0.6) * f, f * 0.6);
-          }`,
+        vertexShader: GLOW_VERT,
+        fragmentShader: GLOW_FRAG,
       })
     );
     group.add(packetGlow);

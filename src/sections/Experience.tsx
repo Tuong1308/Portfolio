@@ -1,5 +1,6 @@
 import { useCallback, useState } from "react";
-import PipelineScene, { STAGES } from "../three/PipelineScene";
+import PipelineScene from "../three/PipelineScene";
+import { STAGES } from "../three/pipelineStages";
 import Reveal from "../components/Reveal";
 import Section from "../components/Section";
 import { EXPERIENCE } from "../data";
